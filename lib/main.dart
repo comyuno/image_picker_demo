@@ -1,6 +1,19 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:custom_image_picker/custom_image_picker.dart';
+import 'package:interactiveviewer_gallery/hero_dialog_route.dart';
+import 'package:interactiveviewer_gallery/interactiveviewer_gallery.dart';
+import 'package:video_player/video_player.dart';
+
+class DemoSourceEntity {
+  int id;
+  String path;
+  String type;
+  String previewPath;
+
+  DemoSourceEntity(this.id, this.type, this.path, {this.previewPath});
+}
 
 void main() {
   runApp(MyApp());
@@ -22,6 +35,7 @@ class MyApp extends StatelessWidget {
 }
 
 class ImageGallery extends StatefulWidget {
+  static final String sName = "/";
   const ImageGallery({Key key}) : super(key: key);
 
   @override
@@ -29,15 +43,32 @@ class ImageGallery extends StatefulWidget {
 }
 
 class _ImageGalleryState extends State<ImageGallery> {
-  List<dynamic> imageList;
+  List<DemoSourceEntity> imageList = [];
 
   Future<void> _getImages() async {
     final customImagePicker = CustomImagePicker();
     customImagePicker.getAllImages(callback: (dynamic retrievedImages) {
-      setState(() {
-        imageList = retrievedImages;
-      });
+      for (int i = 0; i <= retrievedImages.length - 1; i++) {
+        imageList.add(DemoSourceEntity(i, 'image', retrievedImages[i]));
+      }
     });
+  }
+
+  void _openGallery(DemoSourceEntity source) {
+    Navigator.of(context).push(
+      HeroDialogRoute<void>(
+        // DisplayGesture is just debug, please remove it when use
+        builder: (BuildContext context) =>
+            InteractiveviewerGallery<DemoSourceEntity>(
+          sources: imageList,
+          initIndex: imageList.indexOf(source),
+          itemBuilder: itemBuilder,
+          onPageChanged: (int pageIndex) {
+            print("nell-pageIndex:$pageIndex");
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -50,7 +81,7 @@ class _ImageGalleryState extends State<ImageGallery> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Image Gallery')),
-      body: imageList != null
+      body: imageList.isNotEmpty
           ? GridView.builder(
               padding: EdgeInsets.all(8.0),
               itemCount: imageList.length,
@@ -60,37 +91,48 @@ class _ImageGalleryState extends State<ImageGallery> {
                 crossAxisSpacing: 4,
                 childAspectRatio: .7,
               ),
-              itemBuilder: (context, i) {
-                String phoneAlbum = imageList[i];
-                print(phoneAlbum);
-                return Material(
-                  elevation: 8.0,
-                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                  child: InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            FullScreenImagePage(imagePath: phoneAlbum),
-                      ),
-                    ),
-                    child: Hero(
-                      tag: phoneAlbum,
-                      child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: Image.file(
-                            File(phoneAlbum),
-                            fit: BoxFit.cover,
-                          )),
-                    ),
-                  ),
-                );
-              },
+              itemBuilder: (context, i) => _buildItem(imageList[i]),
             )
           : Center(
               child: CircularProgressIndicator(),
             ),
     );
+  }
+
+  Widget _buildItem(DemoSourceEntity source) {
+    return Hero(
+      tag: source.id,
+      placeholderBuilder: (BuildContext context, Size heroSize, Widget child) {
+        // keep building the image since the images can be visible in the
+        // background of the image gallery
+        return child;
+      },
+      child: Material(
+        elevation: 8.0,
+        borderRadius: BorderRadius.all(Radius.circular(8.0)),
+        child: InkWell(
+          onTap: () => _openGallery(source),
+          child: ClipRRect(
+              borderRadius: BorderRadius.circular(8.0),
+              child: Image.file(
+                File(source.path),
+                fit: BoxFit.cover,
+              )),
+        ),
+      ),
+    );
+  }
+
+  Widget itemBuilder(BuildContext context, int index, bool isFocus) {
+    DemoSourceEntity sourceEntity = imageList[index];
+    if (sourceEntity.type == 'video') {
+      return DemoVideoItem(
+        sourceEntity,
+        isFocus: isFocus,
+      );
+    } else {
+      return DemoImageItem(sourceEntity);
+    }
   }
 }
 
@@ -113,5 +155,128 @@ class FullScreenImagePage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class DemoImageItem extends StatelessWidget {
+  final DemoSourceEntity source;
+  DemoImageItem(this.source);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).pop(),
+      child: Center(
+        child: Hero(
+          tag: source.id,
+          child: Image.file(
+            File(source.path),
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DemoVideoItem extends StatefulWidget {
+  final DemoSourceEntity source;
+  final bool isFocus;
+
+  DemoVideoItem(this.source, {this.isFocus});
+
+  @override
+  _DemoVideoItemState createState() => _DemoVideoItemState();
+}
+
+class _DemoVideoItemState extends State<DemoVideoItem> {
+  VideoPlayerController _controller;
+  VoidCallback listener;
+  String localFileName;
+
+  _DemoVideoItemState() {
+    listener = () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+    };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    print('initState: ${widget.source.id}');
+    init();
+  }
+
+  init() async {
+    _controller = VideoPlayerController.network(widget.source.path);
+    // loop play
+    _controller.setLooping(true);
+    await _controller.initialize();
+    setState(() {});
+    _controller.addListener(listener);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    print('dispose: ${widget.source.id}');
+    _controller.removeListener(listener);
+    _controller?.pause();
+    _controller?.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant DemoVideoItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isFocus && !widget.isFocus) {
+      // pause
+      _controller?.pause();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _controller.value.isInitialized
+        ? Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
+                  });
+                },
+                child: Hero(
+                  tag: widget.source.id,
+                  child: AspectRatio(
+                    aspectRatio: _controller.value.aspectRatio,
+                    child: VideoPlayer(_controller),
+                  ),
+                ),
+              ),
+              _controller.value.isPlaying == true
+                  ? SizedBox()
+                  : IgnorePointer(
+                      ignoring: true,
+                      child: Icon(
+                        Icons.play_arrow,
+                        size: 100,
+                        color: Colors.white,
+                      ),
+                    ),
+            ],
+          )
+        : Theme(
+            data: ThemeData(
+                cupertinoOverrideTheme:
+                    CupertinoThemeData(brightness: Brightness.dark)),
+            child: CupertinoActivityIndicator(radius: 30));
   }
 }
