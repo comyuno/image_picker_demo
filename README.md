@@ -1,6 +1,6 @@
-# chainstep
+# Image Picker Demo
 
-Image gallery showroom demo
+Image gallery with fullscreen.
 
 ## Getting Started
 
