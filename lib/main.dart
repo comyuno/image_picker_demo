@@ -61,7 +61,6 @@ class _ImageGalleryState extends State<ImageGallery> {
   void _openGallery(DemoSourceEntity source) {
     Navigator.of(context).push(
       HeroDialogRoute<void>(
-        // DisplayGesture is just debug, please remove it when use
         builder: (BuildContext context) =>
             InteractiveviewerGallery<DemoSourceEntity>(
           sources: imageList,
@@ -106,9 +105,9 @@ class _ImageGalleryState extends State<ImageGallery> {
   Widget _buildItem(DemoSourceEntity source) {
     return Hero(
       tag: source.id,
+      // keep building the image since the images can be visible in the
+      // background of the image gallery
       placeholderBuilder: (BuildContext context, Size heroSize, Widget child) {
-        // keep building the image since the images can be visible in the
-        // background of the image gallery
         return child;
       },
       child: Material(
@@ -211,13 +210,11 @@ class _DemoVideoItemState extends State<DemoVideoItem> {
   @override
   void initState() {
     super.initState();
-    print('initState: ${widget.source.id}');
     init();
   }
 
   init() async {
     _controller = VideoPlayerController.network(widget.source.path);
-    // loop play
     _controller.setLooping(true);
     await _controller.initialize();
     setState(() {});
