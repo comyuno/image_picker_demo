@@ -46,11 +46,15 @@ class _ImageGalleryState extends State<ImageGallery> {
   List<DemoSourceEntity> imageList = [];
 
   Future<void> _getImages() async {
+    List<DemoSourceEntity> demoList = [];
     final customImagePicker = CustomImagePicker();
     customImagePicker.getAllImages(callback: (dynamic retrievedImages) {
       for (int i = 0; i <= retrievedImages.length - 1; i++) {
-        imageList.add(DemoSourceEntity(i, 'image', retrievedImages[i]));
+        demoList.add(DemoSourceEntity(i, 'image', retrievedImages[i]));
       }
+      setState(() {
+        imageList = demoList;
+      });
     });
   }
 
